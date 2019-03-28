@@ -1,5 +1,6 @@
 package com.example.bucketlist;
 
+import android.content.ClipData;
 import android.content.Intent;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
@@ -22,17 +23,17 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
-public class MainActivity extends AppCompatActivity implements RecyclerView.OnItemTouchListener, TaskAdapter.TaskClickListener {
+public class MainActivity extends AppCompatActivity implements RecyclerView.OnItemTouchListener {
 
-    private TaskAdapter mTaskAdapter;
     private RecyclerView mRecyclerView;
     private List<Task> taskList;
+    private TaskAdapter mTaskAdapter;
+    private Executor mExecutor = Executors.newSingleThreadExecutor();
     private TaskRoomDatabase db;
-    private Executor executor = Executors.newSingleThreadExecutor();
     private GestureDetector mGestureDetector;
 
-    public static final String NEW_TASK = "NewTask";
-    public static final int REQUEST_CODE = 4231;
+    public static final int REQUEST_CODE = 1420;
+    public static final String TASK = "Task";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,78 +42,59 @@ public class MainActivity extends AppCompatActivity implements RecyclerView.OnIt
 
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-        db = TaskRoomDatabase.getDatabase(this);
+
         taskList = new ArrayList<>();
-        initRecyclerView();
+        db = TaskRoomDatabase.getDatabase(this);
+
+        mRecyclerView = findViewById(R.id.checkList);
+        mRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        mRecyclerView.addItemDecoration(new DividerItemDecoration(getApplicationContext(), DividerItemDecoration.VERTICAL));
+        mRecyclerView.setAdapter(new TaskAdapter(taskList));
 
         FloatingActionButton fab = findViewById(R.id.fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 Intent intent = new Intent(MainActivity.this, AddTaskActivity.class);
-                startActivityForResult(intent,REQUEST_CODE);
+                startActivityForResult(intent, REQUEST_CODE);
             }
         });
-        getAllTasks();
-    }
 
-    private void initRecyclerView(){
-        mTaskAdapter = new TaskAdapter(this,taskList);
-        mRecyclerView = findViewById(R.id.checkList);
-        mRecyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
-        mRecyclerView.setAdapter(mTaskAdapter);
-        mRecyclerView.addItemDecoration(new DividerItemDecoration(getApplicationContext(),DividerItemDecoration.VERTICAL));
-
-        mGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener(){
+        //Delete item with long click on the item
+        mGestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
             @Override
             public void onLongPress(MotionEvent e) {
                 super.onLongPress(e);
-                View v = mRecyclerView.findChildViewUnder(e.getX(),e.getY());
-                if(v != null){
-                    int adapterPosition = mRecyclerView.getChildAdapterPosition(v);
+                View child = mRecyclerView.findChildViewUnder(e.getX(), e.getY());
+                if (child != null) {
+                    int adapterPosition = mRecyclerView.getChildAdapterPosition(child);
                     deleteTask(taskList.get(adapterPosition));
                 }
             }
         });
 
         mRecyclerView.addOnItemTouchListener(this);
+
         getAllTasks();
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        // Inflate the menu; this adds items to the action bar if it is present.
-        getMenuInflater().inflate(R.menu.menu_main, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        // Handle action bar item clicks here. The action bar will
-        // automatically handle clicks on the Home/Up button, so long
-        // as you specify a parent activity in AndroidManifest.xml.
-        int id = item.getItemId();
-
-        //noinspection SimplifiableIfStatement
-        if (id == R.id.delete) {
-            deleteTasks(taskList);
-            return true;
-        }
-
-        return super.onOptionsItemSelected(item);
-    }
-
-    private void deleteTasks(final List<Task> tasks){
-        executor.execute(new Runnable() {
+    private void getAllTasks() {
+        mExecutor.execute(new Runnable() {
             @Override
             public void run() {
-               db.dao().delete(tasks);
-               getAllTasks();
+                taskList = db.dao().getAllTasks();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        updateUI();
+                    }
+                });
             }
         });
     }
-    private void deleteTask(final Task task){
-        executor.execute(new Runnable() {
+
+    private void deleteTask(final Task task) {
+        mExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 db.dao().delete(task);
@@ -120,17 +102,9 @@ public class MainActivity extends AppCompatActivity implements RecyclerView.OnIt
             }
         });
     }
-    private void updateTask(final Task task){
-        executor.execute(new Runnable() {
-            @Override
-            public void run() {
-                db.dao().update(task);
-                getAllTasks();
-            }
-        });
-    }
-    private void insertTasks(final Task task){
-        executor.execute(new Runnable() {
+
+    private void insertTask(final Task task) {
+        mExecutor.execute(new Runnable() {
             @Override
             public void run() {
                 db.dao().insert(task);
@@ -139,24 +113,52 @@ public class MainActivity extends AppCompatActivity implements RecyclerView.OnIt
         });
     }
 
-    private void updateUI(List<Task> tasks){
-        taskList.clear();
-        taskList.addAll(tasks);
-        mTaskAdapter.notifyDataSetChanged();
-    }
-    private void getAllTasks(){
-        executor.execute(new Runnable() {
+    private void deleteAllTasks(final List<Task> tasks) {
+        mExecutor.execute(new Runnable() {
             @Override
             public void run() {
-                final List<Task> tasks = db.dao().getAllTasks();
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        updateUI(tasks);
-                    }
-                });
+                db.dao().delete(tasks);
+                getAllTasks();
             }
         });
+    }
+
+    private void updateUI() {
+        if (mTaskAdapter == null) {
+            mTaskAdapter = new TaskAdapter(taskList);
+            mRecyclerView.setAdapter(mTaskAdapter);
+        } else {
+            mTaskAdapter.swapList(taskList);
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_main, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+
+        //noinspection SimplifiableIfStatement
+        if (id == R.id.delete) {
+            deleteAllTasks(taskList);
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
+        if (requestCode == REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                Task newTask = data.getParcelableExtra(MainActivity.TASK);
+                insertTask(newTask);
+            }
+        }
     }
 
     @Override
@@ -176,25 +178,7 @@ public class MainActivity extends AppCompatActivity implements RecyclerView.OnIt
     }
 
     @Override
-    public void onCheckboxClick(final Task task) {
-        if(task.getCheck()){
-            task.setCheck(Boolean.FALSE);
-        }else{
-            task.setCheck(Boolean.TRUE);
-        }
-        updateTask(task);
-        getAllTasks();
-    }
+    public void onPointerCaptureChanged(boolean hasCapture) {
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if(requestCode == REQUEST_CODE){
-            if(resultCode == RESULT_OK){
-                Task task = data.getParcelableExtra(MainActivity.NEW_TASK);
-                insertTasks(task);
-                updateUI(taskList);
-            }
-        }
     }
 }

@@ -6,24 +6,19 @@ import android.arch.persistence.room.PrimaryKey;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-@Entity(tableName ="taskTable")
+@Entity(tableName = "task_table")
 public class Task implements Parcelable {
+
     @PrimaryKey(autoGenerate = true)
     private Long id;
 
-    @ColumnInfo(name = "taskTitle")
-    private String taskTitle;
+    @ColumnInfo(name = "task")
+    private String title;
+    private String description;
 
-    @ColumnInfo(name = "taskDescription")
-    private String taskDescription;
-
-    @ColumnInfo(name = "check")
-    private Boolean check;
-
-    public Task(String taskTitle, String taskDescription, Boolean check) {
-        this.taskTitle = taskTitle;
-        this.taskDescription = taskDescription;
-        this.check = check;
+    public Task(String title, String description) {
+        this.title = title;
+        this.description = description;
     }
 
     public Long getId() {
@@ -34,28 +29,20 @@ public class Task implements Parcelable {
         this.id = id;
     }
 
-    public String getTaskTitle() {
-        return taskTitle;
+    public String getTitle() {
+        return title;
     }
 
-    public void setTaskTitle(String taskTitle) {
-        this.taskTitle = taskTitle;
+    public void setTitle(String title) {
+        this.title = title;
     }
 
-    public String getTaskDescription() {
-        return taskDescription;
+    public String getDescription() {
+        return description;
     }
 
-    public void setTaskDescription(String taskDescription) {
-        this.taskDescription = taskDescription;
-    }
-
-    public Boolean getCheck() {
-        return check;
-    }
-
-    public void setCheck(Boolean check) {
-        this.check = check;
+    public void setDescription(String description) {
+        this.description = description;
     }
 
     @Override
@@ -65,21 +52,22 @@ public class Task implements Parcelable {
 
     @Override
     public void writeToParcel(Parcel dest, int flags) {
-        dest.writeString(taskTitle);
-        dest.writeString(taskDescription);
-        dest.writeValue(this.check);
-        dest.writeLong(this.id);
+        dest.writeValue(this.id);
+        dest.writeString(this.title);
+        dest.writeString(this.description);
     }
-    protected Task(Parcel in){
-        this.id = in.readLong();
-        this.taskTitle = in.readString();
-        this.taskDescription = in.readString();
-        this.check = (Boolean) in.readValue(Boolean.class.getClassLoader());
+
+
+    protected Task(Parcel in) {
+        this.id = (Long) in.readValue(Long.class.getClassLoader());
+        this.title = in.readString();
+        this.description = in.readString();
     }
-    public static final Parcelable.Creator<Task> CREATOR = new Parcelable.Creator<Task>() {
+
+    public static final Creator<Task> CREATOR = new Creator<Task>() {
         @Override
-        public Task createFromParcel(Parcel in) {
-            return new Task(in);
+        public Task createFromParcel(Parcel source) {
+            return new Task(source);
         }
 
         @Override
@@ -88,3 +76,5 @@ public class Task implements Parcelable {
         }
     };
 }
+
+

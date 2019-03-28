@@ -12,7 +12,7 @@ public abstract class TaskRoomDatabase extends RoomDatabase {
     public abstract DAO dao();
     private static volatile TaskRoomDatabase INSTANCE;
 
-    public static TaskRoomDatabase getDatabase(final Context context){
+    static TaskRoomDatabase getDatabase(final Context context){
         if(INSTANCE == null){
             synchronized (TaskRoomDatabase.class){
                 if(INSTANCE == null){
